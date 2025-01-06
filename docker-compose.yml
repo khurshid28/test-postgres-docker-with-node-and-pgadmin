@@ -1,0 +1,70 @@
+version: "3.8"
+name: ${PROJECT_NAME}
+services:
+  db:
+    image: postgres
+    container_name: db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: khurshid-2827
+      POSTGRES_DB: my_db
+
+    healthcheck:
+      test: pg_isready -U postgres -h db;
+      interval: 1s
+      timeout: 1s
+      retries: 3
+    volumes:
+      - ./init/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - server-network
+
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4
+    depends_on:
+      db:
+        condition: service_healthy
+    links:
+      - db
+    ports:
+      - "5050:80"
+    networks:
+      - server-network
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: khurshid-2827
+    restart: unless-stopped
+
+  backend_app:
+    build: 
+      context: ./
+      args:
+        - GIT_COMMIT
+
+    container_name: backend_app
+    depends_on:
+      db:
+        condition: service_healthy
+    links:
+      - db
+    networks:
+      - server-network
+    ports:
+      - 8080:8080
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+
+volumes:
+  pg-data:
+
+networks:
+  server-network:
+    driver: bridge
